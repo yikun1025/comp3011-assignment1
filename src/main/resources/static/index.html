@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Speech to Text</title>
+
+  <link rel="stylesheet" href="css/app.css">
+</head>
+
+<body>
+
+  <main>
+    <header>
+      <h1>Speech to Text</h1>
+      <p>
+        Record a short audio clip and your transcript will appear below.
+      </p>
+    </header>
+
+    <section aria-labelledby="recording-heading">
+      <h2 id="recording-heading">Record Audio</h2>
+
+      <button
+        type="button"
+        id="record-button"
+        aria-pressed="false"
+      >
+        Start Recording
+      </button>
+
+      <p>
+        Recording time:
+        <span id="timer">00:00</span>
+      </p>
+
+      <p id="status" aria-live="polite">
+        Ready
+      </p>
+    </section>
+
+
+    <section aria-labelledby="transcript-heading">
+      <h2 id="transcript-heading">Transcript</h2>
+
+      <div id="transcript" aria-live="polite">
+        <p>Your transcript will appear here.</p>
+      </div>
+    </section>
+
+
+    <div id="error" role="alert" hidden>
+      <p id="error-message"></p>
+    </div>
+
+  </main>
+
+</body>
+</html>
