@@ -1,5 +1,6 @@
 package comp3011.assignment1.web;
 
+import comp3011.assignment1.exception.SpeechToTextException;
 import comp3011.assignment1.model.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -67,6 +68,11 @@ public class GlobalExceptionHandler {
                 "Audio must be uploaded as multipart/form-data.", request);
     }
 
+    @ExceptionHandler(SpeechToTextException.class)
+    public ResponseEntity<ErrorResponse> handleSpeechToText(
+            SpeechToTextException ex, HttpServletRequest request) {
+        return build(ex.getStatus(), ex.getMessage(), request);
+    }
 
     /**
      * Exceptions that already carry their own HTTP status,
