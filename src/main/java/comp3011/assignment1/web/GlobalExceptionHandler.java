@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.util.Set;
 
@@ -55,6 +56,22 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.METHOD_NOT_ALLOWED,
                 "Request method '" + request.getMethod() + "' is not supported.",
                 request, headers);
+    }
+
+    /**
+     * Exceptions that already carry their own HTTP status,
+     * e.g. the 400 thrown by TranscriptionController for an empty upload.
+     * Without this handler they would fall through to the 500 catch-all.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatus(
+            ResponseStatusException ex, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        String message = (ex.getReason() != null) ? ex.getReason() : status.getReasonPhrase();
+        return build(status, message, request);
     }
 
     /**
