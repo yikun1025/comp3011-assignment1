@@ -10,12 +10,12 @@
 
 :root {
   font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
 
   color: #1d1d1f;
   background: #f5f5f7;
@@ -49,8 +49,8 @@ main {
   padding: 42px;
 
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.03),
-    0 12px 40px rgba(0, 0, 0, 0.06);
+          0 1px 2px rgba(0, 0, 0, 0.03),
+          0 12px 40px rgba(0, 0, 0, 0.06);
 }
 
 
@@ -108,15 +108,20 @@ h2 {
 
 
 /* =========================
-   Record button
+   Control buttons
+
+   Shared by Start and Stop. Both buttons stay in the DOM at all
+   times; the inactive one is disabled rather than hidden, so its
+   label remains readable to anything inspecting the page.
    ========================= */
 
-#record-button {
+.control-button {
   appearance: none;
 
   min-width: 170px;
 
   padding: 13px 22px;
+  margin-right: 10px;
 
   border: 1px solid #1c1c1e;
   border-radius: 999px;
@@ -131,13 +136,13 @@ h2 {
   cursor: pointer;
 
   transition:
-    transform 160ms ease,
-    background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+          transform 160ms ease,
+          background-color 160ms ease,
+          border-color 160ms ease,
+          box-shadow 160ms ease;
 }
 
-#record-button:hover {
+.control-button:hover {
   background: #343437;
   border-color: #343437;
 
@@ -146,26 +151,65 @@ h2 {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
 }
 
-#record-button:active {
+.control-button:active {
   transform: translateY(0);
 }
 
-#record-button:focus-visible {
+.control-button:focus-visible {
   outline: 3px solid rgba(40, 110, 255, 0.3);
   outline-offset: 4px;
 }
 
 
-/* Recording state */
+/* Disabled state
 
-#record-button[aria-pressed="true"] {
-  background: #b42318;
-  border-color: #b42318;
+   The :disabled:hover rule is not redundant. Without it the
+   :hover rule above still applies, so a disabled button lifts
+   and darkens under the cursor and reads as clickable. */
+
+.control-button:disabled {
+  background: #d2d2d7;
+  border-color: #d2d2d7;
+  color: #8a8a8f;
+
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
-#record-button[aria-pressed="true"]:hover {
-  background: #971d14;
-  border-color: #971d14;
+.control-button:disabled:hover {
+  background: #d2d2d7;
+  border-color: #d2d2d7;
+
+  transform: none;
+  box-shadow: none;
+}
+
+
+/* =========================
+   Recording indicator
+   ========================= */
+
+#recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  margin: 20px 0 0;
+
+  font-size: 0.95rem;
+  font-weight: 600;
+
+  color: #b42318;
+}
+
+#recording-indicator span {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
 }
 
 
@@ -311,8 +355,9 @@ h2 {
     padding: 24px 0;
   }
 
-  #record-button {
+  .control-button {
     width: 100%;
+    margin: 0 0 10px;
   }
 
   #transcript {
@@ -325,10 +370,17 @@ h2 {
 
 /* =========================
    Reduced motion
+
+   The animation stops but the indicator stays visible: what is
+   removed is the movement, not the information it carries.
    ========================= */
 
 @media (prefers-reduced-motion: reduce) {
-  #record-button {
+  .control-button {
     transition: none;
+  }
+
+  #recording-indicator span {
+    animation: none;
   }
 }
