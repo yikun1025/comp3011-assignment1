@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.util.Set;
@@ -58,6 +59,7 @@ public class GlobalExceptionHandler {
                 request, headers);
     }
 
+
     /**
      * Exceptions that already carry their own HTTP status,
      * e.g. the 400 thrown by TranscriptionController for an empty upload.
@@ -72,6 +74,17 @@ public class GlobalExceptionHandler {
         }
         String message = (ex.getReason() != null) ? ex.getReason() : status.getReasonPhrase();
         return build(status, message, request);
+    }
+    /**
+     * 
+     * 400: the upload has no multipart part named "audio",
+     * e.g. the front end appended the file under a different name.
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingPart(
+            MissingServletRequestPartException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST,
+                "Required multipart part '" + ex.getRequestPartName() + "' is missing.", request);
     }
 
     /**
