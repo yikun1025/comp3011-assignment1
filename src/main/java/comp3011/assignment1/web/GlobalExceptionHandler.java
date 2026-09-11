@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -76,7 +77,7 @@ public class GlobalExceptionHandler {
         return build(status, message, request);
     }
     /**
-     * 
+     *
      * 400: the upload has no multipart part named "audio",
      * e.g. the front end appended the file under a different name.
      */
@@ -85,6 +86,17 @@ public class GlobalExceptionHandler {
             MissingServletRequestPartException ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST,
                 "Required multipart part '" + ex.getRequestPartName() + "' is missing.", request);
+    }
+
+    /**
+     * 413: the upload is larger than spring.servlet.multipart.max-file-size.
+     * Spring rejects it while parsing the request, before the controller runs.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadTooLarge(
+            MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        return build(HttpStatus.CONTENT_TOO_LARGE,
+                "Audio file exceeds the maximum upload size.", request);
     }
 
     /**
