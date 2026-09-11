@@ -25,3 +25,42 @@
     <button type="button" id="start-button" class="control-button">
       Start Recording
     </button>
+
+    <button type="button" id="stop-button" class="control-button" disabled>
+      Stop Recording
+    </button>
+
+    <p id="recording-indicator" hidden>
+      <span aria-hidden="true">●</span> Recording
+    </p>
+
+    <p class="timer-line">
+      Recording time:
+      <span id="timer">00:00</span>
+    </p>
+
+    <p id="status" aria-live="polite">
+      Ready
+    </p>
+  </section>
+
+
+  <section aria-labelledby="transcript-heading">
+    <h2 id="transcript-heading">Transcript</h2>
+
+    <div id="transcript" aria-live="polite">
+      <p class="placeholder">Your transcript will appear here.</p>
+    </div>
+  </section>
+
+
+  <div id="error" role="alert" hidden>
+    <p id="error-message"></p>
+  </div>
+
+</main>
+
+<script src="js/app.js"></script>
+
+</body>
+</html>

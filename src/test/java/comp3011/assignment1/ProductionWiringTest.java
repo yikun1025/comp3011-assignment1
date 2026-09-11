@@ -1,14 +1,5 @@
 package comp3011.assignment1;
 
-import comp3011.assignment1.config.OpenAiProperties;
-import comp3011.assignment1.service.OpenAiSpeechToTextService;
-import comp3011.assignment1.service.SpeechToTextService;
-import org.springframework.beans.factory.annotation.Autowired;
-
-public class ProductionWiringTest {
-}
-package comp3011.assignment1;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 import comp3011.assignment1.config.OpenAiProperties;
