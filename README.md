@@ -15,7 +15,7 @@ to run it, see [Running](#running) at the end.
 |---|---|---|---|
 | `GET` | `/` | Single page with the recording controls | Done |
 | `GET` | `/api/v1/admin/uptime` | Server start time and uptime in seconds | Done |
-| `POST` | `/api/v1/transcribe` | Accepts `multipart/form-data`, returns the transcript | Stub complete, real service pending |
+| `POST` | `/api/v1/transcribe` | Accepts `multipart/form-data`, returns the transcript | Done |
 | `GET` | `/api/v1/global/stats` | Cumulative input and output token counts | Not implemented |
 | `POST` | `/api/v1/admin/shutdown` | Requests a graceful shutdown | Not implemented |
 
@@ -131,8 +131,12 @@ up. It is annotated `@ActiveProfiles("stub")` because the real speech-to-text
 implementation does not exist yet, so under the default profile there is no
 `SpeechToTextService` bean and the context genuinely cannot start.
 
-Once the real implementation exists, a separate test will cover the default
-profile, asserting that the production wiring is correct.
+`ProductionWiringTest` covers the default profile separately. With no API key
+available locally, it is the only thing that can catch a wiring or model-name
+mistake before submission: it starts the default context with a placeholder
+key and asserts what was actually assembled, without making a network call.
+The model name is compared verbatim — a `startsWith` check would pass for a
+model the specification does not ask for.
 
 ---
 
@@ -210,3 +214,6 @@ mvn test
 | `Assignment1ApplicationTests` | The application context starts under the stub profile |
 
 More entries to follow as the remaining stages are completed.
+
+| `ProductionWiringTest` | The default profile assembles the real service, with the exact model name the specification requires |
+| `StubWiringTest` | The stub profile needs no API key — `OpenAiProperties` is not created at all |
