@@ -35,5 +35,9 @@ public class ShutdownService {
             throw new ShutdownInProgressException();
         }
         executor.shutdown();
+
+        
+//        shutdownRequested.set(true);
+//        executor.shutdown();
     }
 }
