@@ -1,5 +1,6 @@
 package comp3011.assignment1.web;
 
+import comp3011.assignment1.exception.ShutdownInProgressException;
 import comp3011.assignment1.exception.SpeechToTextException;
 import comp3011.assignment1.model.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -110,6 +111,17 @@ public class GlobalExceptionHandler {
             MaxUploadSizeExceededException ex, HttpServletRequest request) {
         return build(HttpStatus.CONTENT_TOO_LARGE,
                 "Audio file exceeds the maximum upload size.", request);
+    }
+
+    /**
+     * A repeat shutdown request is a conflict with the server's current state,
+     * not a malformed request - the client did nothing wrong, it is simply too
+     * late. Status and wording are both fixed by the API spec.
+     */
+    @ExceptionHandler(ShutdownInProgressException.class)
+    public ResponseEntity<ErrorResponse> handleShutdownInProgress(
+            ShutdownInProgressException ex, HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
     /**
