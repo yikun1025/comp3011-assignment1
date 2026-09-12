@@ -122,7 +122,8 @@ content negotiation, not a gap in the error handling.
 
 **The 500 message is a fixed string** and never includes the exception text.
 Exception messages can contain internal paths, upstream response bodies, or
-credentials. The full exception goes to the log; the client gets a constant.
+credentials. The server logs only the exception type and request path; the
+client gets a constant.
 
 ### The context load test runs under the stub profile
 
@@ -261,3 +262,4 @@ mvn test
 | `AdminAndStatsControllerTest` | Uptime, statistics and graceful-shutdown controller contracts are stable |
 | `ConcurrentLoadTest` | More than 200 real simultaneous blocking HTTP requests succeed without serial delay |
 | `StatisticsRaceConditionTest` | Token statistics retain every update and only one concurrent shutdown caller wins |
+| `GlobalExceptionHandlerTest` | Unexpected exception messages, including secret-like values, never reach logs or clients |

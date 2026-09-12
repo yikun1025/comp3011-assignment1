@@ -130,7 +130,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex, HttpServletRequest request) {
-        log.error("Unhandled exception for {}", request.getRequestURI(), ex);
+        // Do not log arbitrary exception messages or stack traces here. An
+        // upstream library can include request details in either, including
+        // sensitive headers. The type and path are enough to diagnose the
+        // route while keeping the generic error path safe for credentials.
+        log.error("Unhandled exception: type={}, path={}",
+                ex.getClass().getSimpleName(), request.getRequestURI());
         return build(HttpStatus.INTERNAL_SERVER_ERROR,
                 "An unexpected server error occurred.", request);
     }
