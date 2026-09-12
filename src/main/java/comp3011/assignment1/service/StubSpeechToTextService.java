@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Fake speech-to-text service for offline runs and tests.
@@ -22,6 +23,8 @@ public class StubSpeechToTextService implements SpeechToTextService {
     public static final long STUB_OUTPUT_TOKENS = 5;
 
     private final Duration delay;
+    private final AtomicInteger inFlight = new AtomicInteger();
+    private final AtomicInteger peakInFlight = new AtomicInteger();
 
     public StubSpeechToTextService(@Value("${app.stub.delay:200ms}") Duration delay) {
         this.delay = delay;
@@ -29,12 +32,27 @@ public class StubSpeechToTextService implements SpeechToTextService {
 
     @Override
     public TranscriptionResult transcribe(byte[] audio, String contentType) {
+        int current = inFlight.incrementAndGet();
+        peakInFlight.accumulateAndGet(current, Math::max);
         try {
             Thread.sleep(delay);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Stub transcription was interrupted", e);
+        } finally {
+            inFlight.decrementAndGet();
         }
         return new TranscriptionResult(STUB_TEXT, STUB_INPUT_TOKENS, STUB_OUTPUT_TOKENS);
+    }
+
+    /** Largest number of calls simultaneously waiting in the stub since the last reset. */
+    public int peakConcurrentCalls() {
+        return peakInFlight.get();
+    }
+
+    /** Test-only metric reset; callers invoke it only when no transcription is in flight. */
+    public void resetMetrics() {
+        inFlight.set(0);
+        peakInFlight.set(0);
     }
 }
