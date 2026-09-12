@@ -158,6 +158,8 @@ than as a successful empty transcript.
 The browser supplies a MIME type, but OpenAI also needs a plausible filename
 extension when parsing multipart data. `AudioFilenames` maps supported media
 types to a safe server-chosen filename; it never trusts a browser filename.
+The controller validates the same supported-type list before choosing either
+the stub or Cloud implementation, so local and deployed behaviour match.
 
 Each STT log entry contains only the byte count, generated filename, model,
 elapsed time and token counts. It intentionally omits the bearer token,

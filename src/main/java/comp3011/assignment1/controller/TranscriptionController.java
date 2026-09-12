@@ -4,6 +4,7 @@ import comp3011.assignment1.model.TranscriptionResponse;
 import comp3011.assignment1.model.TranscriptionResult;
 import comp3011.assignment1.service.SpeechToTextService;
 import comp3011.assignment1.service.TokenUsageStatisticsService;
+import comp3011.assignment1.util.AudioFilenames;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,7 +38,11 @@ public class TranscriptionController {
         if (audio.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Audio file must not be empty.");
         }
-        TranscriptionResult result = speechToTextService.transcribe(audio.getBytes(), audio.getContentType());
+        // Validate before selecting a profile-dependent STT implementation.
+        // Otherwise the offline stub would accept a media type that the real
+        // provider path rejects, making local regression tests misleading.
+        String contentType = AudioFilenames.supportedMimeType(audio.getContentType());
+        TranscriptionResult result = speechToTextService.transcribe(audio.getBytes(), contentType);
 
         // Record usage only on the success path: a failed call throws before
         // reaching this line, so the counters never include work that produced

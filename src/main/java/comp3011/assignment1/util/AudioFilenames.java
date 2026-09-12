@@ -37,7 +37,12 @@ public final class AudioFilenames {
         // Utility class: never instantiated.
     }
 
-    public static String filenameFor(String contentType) {
+    /**
+     * Normalises and validates a browser-supplied audio media type. Keeping
+     * this before the service boundary makes the stub and Cloud profiles obey
+     * the same public API contract.
+     */
+    public static String supportedMimeType(String contentType) {
         if (contentType == null || contentType.isBlank()) {
             throw new SpeechToTextException(
                     HttpStatus.UNSUPPORTED_MEDIA_TYPE,
@@ -51,6 +56,11 @@ public final class AudioFilenames {
                     HttpStatus.UNSUPPORTED_MEDIA_TYPE,
                     "Unsupported audio type: " + mimeType);
         }
-        return BASE_NAME + "." + extension;
+        return mimeType;
+    }
+
+    public static String filenameFor(String contentType) {
+        String mimeType = supportedMimeType(contentType);
+        return BASE_NAME + "." + EXTENSIONS.get(mimeType);
     }
 }

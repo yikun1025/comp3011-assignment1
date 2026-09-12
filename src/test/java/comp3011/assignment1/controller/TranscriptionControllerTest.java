@@ -86,4 +86,16 @@ class TranscriptionControllerTest {
                 .andExpect(jsonPath("$.path").value("/api/v1/transcribe"))
                 .andExpect(jsonPath("$.length()").value(5));
     }
+
+    @Test
+    void unsupportedAudioTypeIsRejectedBeforeTheStubOrCloudServiceRuns() throws Exception {
+        MockMultipartFile audio = new MockMultipartFile(
+                "audio", "recording.txt", "text/plain", new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/api/v1/transcribe").file(audio))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.status").value(415))
+                .andExpect(jsonPath("$.message").value("Unsupported audio type: text/plain"))
+                .andExpect(jsonPath("$.length()").value(5));
+    }
 }
