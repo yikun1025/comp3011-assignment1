@@ -16,8 +16,8 @@ to run it, see [Running](#running) at the end.
 | `GET` | `/` | Single page with the recording controls | Done |
 | `GET` | `/api/v1/admin/uptime` | Server start time and uptime in seconds | Done |
 | `POST` | `/api/v1/transcribe` | Accepts `multipart/form-data`, returns the transcript | Done |
-| `GET` | `/api/v1/global/stats` | Cumulative input and output token counts | Not implemented |
-| `POST` | `/api/v1/admin/shutdown` | Requests a graceful shutdown | Not implemented |
+| `GET` | `/api/v1/global/stats` | Cumulative input and output token counts | Done |
+| `POST` | `/api/v1/admin/shutdown` | Requests a graceful shutdown | Done |
 
 ---
 
@@ -127,9 +127,8 @@ credentials. The full exception goes to the log; the client gets a constant.
 ### The context load test runs under the stub profile
 
 `Assignment1ApplicationTests` starts the whole application and asserts it comes
-up. It is annotated `@ActiveProfiles("stub")` because the real speech-to-text
-implementation does not exist yet, so under the default profile there is no
-`SpeechToTextService` bean and the context genuinely cannot start.
+up. It is annotated `@ActiveProfiles("stub")` so the ordinary test suite never
+makes a paid network call or requires a secret.
 
 `ProductionWiringTest` covers the default profile separately. With no API key
 available locally, it is the only thing that can catch a wiring or model-name
@@ -140,44 +139,89 @@ model the specification does not ask for.
 
 ---
 
-## Not yet written
-
-The sections below are placeholders for work still to be done. Each needs the
-reasoning filled in, not just a description of what the code does.
-
 ### Calling the real speech-to-text service
 
-- Why the read timeout is bounded, and how its value relates to the five-second
-  response requirement
-- How upstream failures map onto status codes returned to the client, and why a
-  timeout becomes 504 rather than 502
-- Why the audio filename extension is derived from the MIME type
-- What the call log records, and what it deliberately does not
+The OpenAI `RestClient` has a five-second connection timeout and a ten-second
+read timeout. A request waiting forever for an upstream service is especially
+harmful under load: it would keep one request alive indefinitely. The browser
+waits fifteen seconds, longer than the server's ten-second upstream window, so
+a slow provider produces the useful server-side 504 response instead of an
+unexplained browser cancellation.
+
+The service deliberately translates provider failures into stable API errors:
+429 becomes 503 (the application cannot serve another transcription right
+now), 413 stays 413, other upstream error statuses become 502, and a transport
+timeout becomes 504. A missing response body is also treated as 502 rather
+than as a successful empty transcript.
+
+The browser supplies a MIME type, but OpenAI also needs a plausible filename
+extension when parsing multipart data. `AudioFilenames` maps supported media
+types to a safe server-chosen filename; it never trusts a browser filename.
+
+Each STT log entry contains only the byte count, generated filename, model,
+elapsed time and token counts. It intentionally omits the bearer token,
+Authorization header, audio bytes and transcript text.
 
 ### Browser recording
 
-- The state machine, and why all visual changes go through one function
-- Compression settings and the resulting size of a thirty-second recording
-- Container format negotiation across browsers
-- Why the client timeout must exceed the server read timeout
+The browser has three states: `idle`, `recording` and `transcribing`.
+`setState` is the only place that changes button availability, recording
+indicator, timer and status text. This prevents combinations such as an enabled
+Start button while recording or a timer that keeps running while uploading.
+
+The recorder requests mono 16 kHz audio at 24 kbps, with echo cancellation and
+noise suppression. Speech at 24 kbps is about 3 KB/s, so a thirty-second clip
+is roughly 90 KB. This reduces upload time while retaining intelligible speech.
+
+The page negotiates a container before constructing `MediaRecorder`: it prefers
+WebM/Opus where available and falls back through WebM, MP4 and Ogg. This avoids
+assuming Chrome's format on Safari. `async`/`await`, `AbortController`, and a
+single error-display path make microphone, network, timeout and API failures
+visible to the user before the controls return to `idle`.
 
 ### Statistics and graceful shutdown
 
-- Why the token counters use an atomic type
-- Why "shut down only once" needs a single atomic operation, not a check
-  followed by a write
-- Why the graceful shutdown window exceeds the upstream read timeout
+Successful transcription results carry input and output token counts internally
+to `TokenUsageStatisticsService`. Its `LongAdder` counters avoid lost updates
+when many request threads finish together; failed calls do not reach the record
+operation and therefore do not inflate the totals.
+
+`ShutdownService` uses `AtomicBoolean.compareAndSet(false, true)` so testing
+and setting the shutdown flag happen as one operation. A separate `if` followed
+by an assignment could let two simultaneous callers both begin shutdown. The
+winning request is answered first; a separate non-daemon thread closes the
+Spring context after a short delay. Spring's 15-second graceful-shutdown phase
+is longer than the ten-second upstream read timeout, allowing an in-flight STT
+call enough time to finish before the process exits.
 
 ### Concurrency
 
-- Which concurrency model was chosen and why the alternatives were rejected
-- Which races exist and how each is prevented
-- What the load test asserts, and why asserting peak concurrency matters
+The controller retains ordinary blocking code because waiting for an external
+HTTP response is easier to read and reason about than a callback chain. Spring
+Boot's virtual-thread support lets many such waits overlap without consuming a
+large platform-thread pool. The controller itself has no per-request mutable
+fields; shared state is limited to the atomic token totals and shutdown flag.
+
+`ConcurrentLoadTest` sends 250 real multipart HTTP requests to an embedded
+Tomcat server at one gate. The stub blocks each request for 300 ms and records
+the peak simultaneous calls. The test requires every response to be 200, peak
+overlap above 200, and completion far faster than serial execution.
+`StatisticsRaceConditionTest` releases 400 virtual threads together against
+the shared controller and requires the exact expected token-total increase. It
+also releases 64 shutdown contenders and proves that exactly one wins. These
+tests would expose a plain `long += value` counter or an `if (!flag)` shutdown
+implementation.
 
 ### Keeping the API key out of everything
 
-- Why scrubbing happens in the logging pipeline rather than at each call site
-- The path by which an exception can leak past an exception handler
+`OPENAI_API_KEY` is read at process startup through the environment-backed
+configuration property, never from browser JavaScript or a committed file. The
+stub profile does not create the OpenAI configuration at all, so offline tests
+need no placeholder secret. `OpenAiProperties` overrides its generated
+`toString()` to replace the key with `***`; this matters because configuration
+binding errors can otherwise log the complete configuration object. No API
+endpoint returns provider configuration, and the explicit STT logs avoid secret
+or audio content fields.
 
 ---
 
@@ -212,8 +256,8 @@ mvn test
 |---|---|
 | `UptimeServiceTest` | Uptime is computed exactly, against a controlled clock |
 | `Assignment1ApplicationTests` | The application context starts under the stub profile |
-
-More entries to follow as the remaining stages are completed.
-
 | `ProductionWiringTest` | The default profile assembles the real service, with the exact model name the specification requires |
 | `StubWiringTest` | The stub profile needs no API key — `OpenAiProperties` is not created at all |
+| `AdminAndStatsControllerTest` | Uptime, statistics and graceful-shutdown controller contracts are stable |
+| `ConcurrentLoadTest` | More than 200 real simultaneous blocking HTTP requests succeed without serial delay |
+| `StatisticsRaceConditionTest` | Token statistics retain every update and only one concurrent shutdown caller wins |
