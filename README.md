@@ -262,6 +262,7 @@ mvn test
 | `ProductionWiringTest` | The default profile assembles the real service, with the exact model name the specification requires |
 | `StubWiringTest` | The stub profile needs no API key — `OpenAiProperties` is not created at all |
 | `AdminAndStatsControllerTest` | Uptime, statistics and graceful-shutdown controller contracts are stable |
+| `TranscriptionControllerTest` | Successful uploads, empty audio, missing parts, non-multipart bodies and unsupported audio types have stable HTTP contracts |
 | `ConcurrentLoadTest` | More than 200 real simultaneous blocking HTTP requests succeed without serial delay |
 | `StatisticsRaceConditionTest` | Token statistics retain every update and only one concurrent shutdown caller wins |
 | `GlobalExceptionHandlerTest` | Unexpected exception messages, including secret-like values, never reach logs or clients |
