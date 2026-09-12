@@ -1,28 +1,29 @@
 package comp3011.assignment1.web;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.util.Set;
+
 import comp3011.assignment1.exception.ShutdownInProgressException;
 import comp3011.assignment1.exception.SpeechToTextException;
 import comp3011.assignment1.model.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-import java.util.Set;
 
-import java.time.Clock;
-import java.time.Instant;
-
+/** Produces one documented JSON error shape for application and framework failures. */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -34,22 +35,14 @@ public class GlobalExceptionHandler {
         this.clock = clock;
     }
 
-    /**
-     * 404：path not exist
-     * Spring can't find the static resours then throw NoResourceFoundException。
-     */
-
+    /** A route or static resource was not found. */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(
             NoResourceFoundException ex, HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, "No endpoint " + request.getMethod()
                 + " " + request.getRequestURI() + ".", request);
     }
-    /**
-     * 405：path exist but not correct method 。
-     * Spring  HttpRequestMethodNotSupportedException，
-     */
-
+    /** The path exists but does not support the request method. */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleMethodNotAllowed(
             HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
@@ -90,11 +83,7 @@ public class GlobalExceptionHandler {
         String message = (ex.getReason() != null) ? ex.getReason() : status.getReasonPhrase();
         return build(status, message, request);
     }
-    /**
-     *
-     * 400: the upload has no multipart part named "audio",
-     * e.g. the front end appended the file under a different name.
-     */
+    /** The multipart request did not contain the required {@code audio} part. */
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<ErrorResponse> handleMissingPart(
             MissingServletRequestPartException ex, HttpServletRequest request) {
@@ -124,10 +113,7 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
-    /**
-     *  500：if no matches the error then direct to 500
-     */
-
+    /** The final safety net for exceptions without a more specific mapping. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex, HttpServletRequest request) {
         // Do not log arbitrary exception messages or stack traces here. An
@@ -140,7 +126,7 @@ public class GlobalExceptionHandler {
                 "An unexpected server error occurred.", request);
     }
 
-    // --- error response general recall ---
+    // Builds the response shape required by every error endpoint.
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String message,
                                                 HttpServletRequest request) {
@@ -150,11 +136,11 @@ public class GlobalExceptionHandler {
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String message,
                                                 HttpServletRequest request, HttpHeaders headers) {
         ErrorResponse body = new ErrorResponse(
-                Instant.now(clock).toString(), // timestamp
-                status.value(), // status → 405
-                status.getReasonPhrase(),  // error → "Method Not Allowed"
-                message,  // message
-                request.getRequestURI() // path
+                Instant.now(clock).toString(),
+                status.value(),
+                status.getReasonPhrase(),
+                message,
+                request.getRequestURI()
         );
         return new ResponseEntity<>(body, headers, status);
     }

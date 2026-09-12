@@ -9,10 +9,10 @@ import comp3011.assignment1.exception.ShutdownInProgressException;
 /**
  * Guarantees that a graceful shutdown is started exactly once.
  *
- * The flag is an AtomicBoolean, not a boolean. The obvious version -
- *
- *     if (!shuttingDown) { shuttingDown = true; executor.shutdown(); }
- *
+ * The flag is an AtomicBoolean, not a boolean. A separate read and write,
+ * such as {@code if (!shuttingDown) shuttingDown = true}, would allow two
+ * simultaneous callers to pass the check. compareAndSet makes the decision
+ * and state change one atomic operation.
  */
 @Service
 public class ShutdownService {
@@ -35,9 +35,5 @@ public class ShutdownService {
             throw new ShutdownInProgressException();
         }
         executor.shutdown();
-
-        
-//        shutdownRequested.set(true);
-//        executor.shutdown();
     }
 }
