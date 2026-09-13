@@ -267,11 +267,16 @@ running against the real service locally on 21. The concurrency tests use the
 stub and are unaffected either way.
 
 **Windows caps the TCP accept backlog at 200.** `ConcurrentLoadTest` opens 250
-connections at once. Linux queues the overflow and the client retries
-transparently; Windows refuses it outright, so the test can fail on a Windows
-development machine with `ConnectException` while passing on Linux. Running the
-class on its own usually passes. This is an operating-system limit, not an
-application one.
+connections at once. Linux queues the overflow and the client's SYN retransmit
+connects a moment later; Windows refuses it outright with `ConnectException`.
+The test client therefore retries a *refused* connect a few times with a short
+backoff — reproducing in the test what the Linux kernel does for free — so the
+test measures the server rather than the operating system. Only refusals are
+retried; timeouts and HTTP errors surface as real results. The assertions are
+unchanged, and the retry cannot fake concurrency: forcing the backlog down to 5
+makes dozens of connects retry and the measured peak drops accordingly, which
+is exactly what a serialising server would show. The test prints the retry
+count so it stays visible.
 
 ---
 

@@ -10,6 +10,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
 import java.io.ByteArrayOutputStream;
+import java.net.ConnectException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -23,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,6 +44,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ConcurrentLoadTest {
 
     private static final int REQUESTS = 250;
+
+    /** Refused connects are retried this many times; see sendWithConnectRetry. */
+    private static final int MAX_CONNECT_ATTEMPTS = 5;
+
+    private final AtomicInteger connectRetries = new AtomicInteger();
     private static final String BOUNDARY = "----Assignment1ConcurrentTest";
 
     @LocalServerPort
@@ -82,7 +89,7 @@ class ConcurrentLoadTest {
 
                     ready.countDown();
                     startGate.await();
-                    return client.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
+                    return sendWithConnectRetry(client, request);
                 }));
             }
 
@@ -106,6 +113,33 @@ class ConcurrentLoadTest {
             assertThat(elapsed)
                     .as("250 serial 300 ms calls would take about 75 seconds")
                     .isLessThan(Duration.ofSeconds(15));
+
+            System.out.printf("Load test: %d requests in %d ms, peak in flight %d, refused connects retried %d%n",
+                    REQUESTS, elapsed.toMillis(), stub.peakConcurrentCalls(), connectRetries.get());
+        }
+    }
+
+    /*
+     * Windows caps the TCP accept backlog at 200 and refuses a connection
+     * above it; Linux queues it and the client's SYN retransmit gets through
+     * a moment later. Retrying a refused connect reproduces the Linux
+     * behaviour, so the test measures the server rather than the operating
+     * system it happens to run on. Only a refusal is retried: a timeout or an
+     * HTTP error is a real result and must surface as one. The three
+     * assertions above are untouched - a server that serialised its work
+     * would still fail the peak-concurrency check.
+     */
+    private int sendWithConnectRetry(HttpClient client, HttpRequest request) throws Exception {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return client.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
+            } catch (ConnectException refused) {
+                if (attempt == MAX_CONNECT_ATTEMPTS) {
+                    throw refused;
+                }
+                connectRetries.incrementAndGet();
+                Thread.sleep(25L * attempt);
+            }
         }
     }
 
