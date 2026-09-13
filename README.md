@@ -188,9 +188,17 @@ is roughly 90 KB. This reduces upload time while retaining intelligible speech.
 
 The page negotiates a container before constructing `MediaRecorder`: it prefers
 WebM/Opus where available and falls back through WebM, MP4 and Ogg. This avoids
-assuming Chrome's format on Safari. `async`/`await`, `AbortController`, and a
-single error-display path make microphone, network, timeout and API failures
-visible to the user before the controls return to `idle`.
+assuming Chrome's format on Safari. Recording runs with a one-second timeslice,
+so the encoder hands data over as it goes and the pause between stopping and
+uploading does not grow with the length of the clip.
+
+`async`/`await`, `AbortController`, and a single error-display path make
+microphone, network, timeout and API failures visible to the user before the
+controls return to `idle`. Microphone failures are told apart by
+`DOMException.name`, because a denied permission, a missing device and a device
+held by another application each need a different fix from the user. If
+`MediaRecorder` itself cannot be constructed, the already-open stream is
+released so the browser's microphone indicator does not stay on.
 
 ### Statistics and graceful shutdown
 
@@ -236,6 +244,35 @@ binding errors can otherwise log the complete configuration object. No API
 endpoint returns provider configuration, and the explicit STT logs avoid secret
 or audio content fields.
 
+### Deployment notes
+
+Three things that behave differently between a development machine and the
+deployment environment, found by running there rather than by reading about it.
+
+**The HTTP client honours the system proxy.** The deployment environment
+launches the JVM with `-Dhttps.proxyHost` set. `SimpleClientHttpRequestFactory`
+is backed by `HttpURLConnection`, which reads those properties and routes the
+OpenAI call through the proxy. The JDK's newer `java.net.http.HttpClient` does
+*not* read them unless told to with `.proxy(ProxySelector.getDefault())`, so
+swapping the client would silently change how the outbound call is routed.
+
+**On Java 21, TLS through `HttpURLConnection` can pin a virtual thread.**
+`SSLSocketImpl` uses `synchronized` internally, and on JDK 21 a virtual thread
+blocking inside `synchronized` cannot unmount from its carrier (a documented
+limit of JEP 444). Under many simultaneous real transcriptions this caps
+effective concurrency near the carrier-thread count. JDK 24 removed the
+restriction (JEP 491), and the deployment environment runs a later release, so
+it does not affect the submitted configuration; it is worth knowing about when
+running against the real service locally on 21. The concurrency tests use the
+stub and are unaffected either way.
+
+**Windows caps the TCP accept backlog at 200.** `ConcurrentLoadTest` opens 250
+connections at once. Linux queues the overflow and the client retries
+transparently; Windows refuses it outright, so the test can fail on a Windows
+development machine with `ConnectException` while passing on Linux. Running the
+class on its own usually passes. This is an operating-system limit, not an
+application one.
+
 ---
 
 ## Running
@@ -265,14 +302,19 @@ java -jar target/stt-app.jar --spring.profiles.active=stub
 mvn test
 ```
 
-| Test | What it proves |
+Every test runs offline under the stub profile except `ProductionWiringTest`
+and `OpenAiSpeechToTextServiceTest`, and neither of those makes a network call
+either. The suite needs no API key and costs nothing to run.
+
+| Test | What it proves, and what would make it fail |
 |---|---|
-| `UptimeServiceTest` | Uptime is computed exactly, against a controlled clock |
+| `UptimeServiceTest` | Uptime is computed exactly against a controlled clock. One case starts the clock 900 ms into a second: it fails if the start instant is ever rounded, which the whole-second cases cannot detect. Another recomputes `utcNow − utcServerStart` from the emitted strings and requires the reported number. |
 | `Assignment1ApplicationTests` | The application context starts under the stub profile |
 | `ProductionWiringTest` | The default profile assembles the real service, with the exact model name the specification requires |
 | `StubWiringTest` | The stub profile needs no API key — `OpenAiProperties` is not created at all |
-| `AdminAndStatsControllerTest` | Uptime, statistics and graceful-shutdown controller contracts are stable |
-| `TranscriptionControllerTest` | Successful uploads, empty audio, missing parts, non-multipart bodies and unsupported audio types have stable HTTP contracts |
-| `ConcurrentLoadTest` | More than 200 real simultaneous blocking HTTP requests succeed without serial delay |
-| `StatisticsRaceConditionTest` | Token statistics retain every update and only one concurrent shutdown caller wins |
-| `GlobalExceptionHandlerTest` | Unexpected exception messages, including secret-like values, never reach logs or clients |
+| `AdminAndStatsControllerTest` | Uptime, statistics and graceful-shutdown controller contracts are stable; the shutdown executor is replaced so the test JVM is not killed |
+| `TranscriptionControllerTest` | The upload endpoint's HTTP contract: success, empty audio, missing part, non-multipart body, unsupported type. Then, with the stub told to fail: the service's status reaches the client in the standard body, a failed call leaves the token counters untouched, and an unanticipated exception yields the fixed 500 with none of its text echoed. |
+| `OpenAiSpeechToTextServiceTest` | The real adapter against a mocked upstream (`MockRestServiceServer`). Verifies the request it builds — `POST`, bearer header — and every branch of the status mapping: 429→503, 413→413, other errors→502, empty body→502, transport failure→504, and that a missing `usage` object counts as zero rather than failing. The stub profile cannot cover this, because it replaces the adapter entirely. |
+| `ConcurrentLoadTest` | More than 200 real simultaneous blocking HTTP requests succeed. The decisive assertion is measured peak in-flight count, not elapsed time — a fast enough serial server would pass a timing check. |
+| `StatisticsRaceConditionTest` | 400 concurrent transcriptions leave the counters exactly right (a lost update makes the total smaller, so a tolerance would hide it), and of 64 simultaneous shutdown callers exactly one wins |
+| `GlobalExceptionHandlerTest` | Captures the actual log output: an unexpected exception's message, including a secret-like value, never reaches the log or the client, while the type, path and stack location do. This is the logging approach under test, not just the response. |
