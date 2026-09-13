@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Fake speech-to-text service for offline runs and tests.
@@ -25,6 +26,7 @@ public class StubSpeechToTextService implements SpeechToTextService {
     private final Duration delay;
     private final AtomicInteger inFlight = new AtomicInteger();
     private final AtomicInteger peakInFlight = new AtomicInteger();
+    private final AtomicReference<RuntimeException> nextFailure = new AtomicReference<>();
 
     public StubSpeechToTextService(@Value("${app.stub.delay:200ms}") Duration delay) {
         this.delay = delay;
@@ -32,6 +34,11 @@ public class StubSpeechToTextService implements SpeechToTextService {
 
     @Override
     public TranscriptionResult transcribe(byte[] audio, String contentType) {
+        RuntimeException failure = nextFailure.getAndSet(null);
+        if (failure != null) {
+            throw failure;
+        }
+
         int current = inFlight.incrementAndGet();
         peakInFlight.accumulateAndGet(current, Math::max);
         try {
@@ -50,9 +57,19 @@ public class StubSpeechToTextService implements SpeechToTextService {
         return peakInFlight.get();
     }
 
+    /**
+     * Makes the next call throw instead of returning a transcript. Test-only:
+     * it is how the controller's error contract is exercised without a
+     * network, since the real provider cannot be told to fail on demand.
+     */
+    public void failNextCallWith(RuntimeException failure) {
+        nextFailure.set(failure);
+    }
+
     /** Test-only metric reset; callers invoke it only when no transcription is in flight. */
     public void resetMetrics() {
         inFlight.set(0);
         peakInFlight.set(0);
+        nextFailure.set(null);
     }
 }
