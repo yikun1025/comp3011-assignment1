@@ -99,7 +99,7 @@ API.
 | Missing `audio` part | `MissingServletRequestPartException` | 400 |
 | Empty upload | `ResponseStatusException` from the controller | 400 |
 | Upload too large | `MaxUploadSizeExceededException` | 413 |
-| Anything else | `Exception` | 500, fixed message, full exception logged |
+| Anything else | `Exception` | 500, fixed message; type, path and location logged, message not |
 
 Three details worth noting:
 
@@ -122,8 +122,17 @@ content negotiation, not a gap in the error handling.
 
 **The 500 message is a fixed string** and never includes the exception text.
 Exception messages can contain internal paths, upstream response bodies, or
-credentials. The server logs only the exception type and request path; the
-client gets a constant.
+credentials. The server logs the exception type, the request path and the
+first few stack frames — class, method and line number cannot carry request
+data, and without them a production 500 cannot be traced — but never the
+message. The client gets a constant.
+
+The same reasoning is why `SpeechToTextException` has no constructor that
+accepts a cause. The exceptions it replaces come from the HTTP client and JSON
+parser, and a chained cause would carry their messages into Spring's own
+DEBUG-level exception logging, which this application does not control.
+`OpenAiSpeechToTextService` logs the failure's class name and throws a fresh
+exception with a fixed message; the original object goes no further.
 
 ### The context load test runs under the stub profile
 

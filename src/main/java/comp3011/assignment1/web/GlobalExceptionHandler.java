@@ -116,14 +116,28 @@ public class GlobalExceptionHandler {
     /** The final safety net for exceptions without a more specific mapping. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex, HttpServletRequest request) {
-        // Do not log arbitrary exception messages or stack traces here. An
-        // upstream library can include request details in either, including
-        // sensitive headers. The type and path are enough to diagnose the
-        // route while keeping the generic error path safe for credentials.
-        log.error("Unhandled exception: type={}, path={}",
-                ex.getClass().getSimpleName(), request.getRequestURI());
+        // The exception message is never logged: an upstream library can put
+        // request details in it, sensitive headers included. Stack frames are
+        // a different matter - class, method and line number cannot contain
+        // request data, and without them a 500 in production is undiagnosable.
+        // So the location is logged and the message is not.
+        log.error("Unhandled exception: type={}, path={}, at={}",
+                ex.getClass().getSimpleName(), request.getRequestURI(), origin(ex));
         return build(HttpStatus.INTERNAL_SERVER_ERROR,
                 "An unexpected server error occurred.", request);
+    }
+
+    /** The first few frames of the trace as one line, e.g. "Foo.bar(Foo.java:12) <- Baz.qux(Baz.java:34)". */
+    private static String origin(Throwable ex) {
+        StackTraceElement[] frames = ex.getStackTrace();
+        StringBuilder at = new StringBuilder();
+        for (int i = 0; i < Math.min(frames.length, 4); i++) {
+            if (i > 0) {
+                at.append(" <- ");
+            }
+            at.append(frames[i]);
+        }
+        return at.length() == 0 ? "(no stack trace)" : at.toString();
     }
 
     // Builds the response shape required by every error endpoint.

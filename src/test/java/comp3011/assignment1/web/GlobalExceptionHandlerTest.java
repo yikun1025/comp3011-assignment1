@@ -40,5 +40,8 @@ class GlobalExceptionHandlerTest {
                 .containsExactly("An unexpected server error occurred.", "/api/v1/transcribe");
         assertThat(output.getAll()).doesNotContain(secretLikeValue);
         assertThat(output.getAll()).contains("IllegalStateException", "/api/v1/transcribe");
+        // The location is what makes the log line useful. The exception was
+        // constructed in this test method, so that frame must be present.
+        assertThat(output.getAll()).contains("GlobalExceptionHandlerTest.java");
     }
 }

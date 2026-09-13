@@ -65,10 +65,23 @@ public class OpenAiSpeechToTextService implements SpeechToTextService {
                         throw mapUpstreamError(upstream.getStatusCode());
                     })
                     .body(OpenAiTranscriptionResponse.class);
+        } catch (SpeechToTextException ex) {
+            // Already mapped by onStatus above.
+            throw ex;
         } catch (ResourceAccessException ex) {
-            log.warn("STT request failed to complete after {} ms; responding 504",
-                    elapsedMillisSince(startedAt));
-            throw new SpeechToTextException(HttpStatus.GATEWAY_TIMEOUT, TIMEOUT_MESSAGE, ex);
+            // Deliberately not chained as the cause. The client library's message can quote
+            // the request it was sending, and a cause travels with the exception into Spring's
+            // own logging, which this application does not control. The class name is enough
+            // to diagnose a transport failure; the message is not worth the exposure.
+            log.warn("STT request failed to complete after {} ms ({}); responding 504",
+                    elapsedMillisSince(startedAt), ex.getClass().getSimpleName());
+            throw new SpeechToTextException(HttpStatus.GATEWAY_TIMEOUT, TIMEOUT_MESSAGE);
+        } catch (RuntimeException ex) {
+            // Anything else the HTTP client or JSON parser raises. Same reasoning as above:
+            // the type is logged, the message and the object itself go no further.
+            log.warn("STT request failed unexpectedly after {} ms ({}); responding 502",
+                    elapsedMillisSince(startedAt), ex.getClass().getSimpleName());
+            throw new SpeechToTextException(HttpStatus.BAD_GATEWAY, UNAVAILABLE_MESSAGE);
         }
 
         long elapsedMillis = elapsedMillisSince(startedAt);
