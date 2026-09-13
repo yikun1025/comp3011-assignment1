@@ -11,8 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class UptimeServiceTest {
 
-    private java.lang.Object system;
-
     @Test
     void reportsElapsedSecondsBetweenStartAndNow() {
         Instant start = Instant.parse("2026-01-01T00:00:00Z");
