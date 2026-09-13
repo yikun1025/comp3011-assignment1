@@ -7,6 +7,16 @@ and statistics endpoints.
 This document explains **why** the application is built the way it is. For how
 to run it, see [Running](#running) at the end.
 
+## Use of AI assistance
+
+Generative AI tools (Claude and Codex) were used during development: for
+Spring Boot and browser API research, comparing design alternatives, debugging,
+drafting some code changes and regression tests, and documentation wording.
+Commits whose changes were drafted with an AI assistant carry a
+`Co-Authored-By` trailer, so the extent of that help is visible in the history.
+Every such change was reviewed, built and run through the test suite before it
+was committed. The full account is in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).
+
 ---
 
 ## Endpoints
