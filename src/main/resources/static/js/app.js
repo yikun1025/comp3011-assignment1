@@ -124,7 +124,7 @@ async function startRecording() {
     try {
         stream = await navigator.mediaDevices.getUserMedia(AUDIO_CONSTRAINTS);
     } catch (err) {
-        showError("Microphone access was refused. Allow it in the browser's site settings and try again.");
+        showError(describeMicrophoneError(err));
         return;
     }
 
@@ -132,7 +132,15 @@ async function startRecording() {
     const options = mimeType ? { ...RECORDER_OPTIONS, mimeType } : RECORDER_OPTIONS;
 
     chunks = [];
-    recorder = new MediaRecorder(stream, options);
+    try {
+        recorder = new MediaRecorder(stream, options);
+    } catch (err) {
+        // The stream is already open at this point. Without this release the
+        // browser keeps showing the microphone as in use with nothing recording.
+        releaseMicrophone();
+        showError("This browser could not start an audio recorder. Try a current version of Chrome, Edge, Firefox or Safari.");
+        return;
+    }
 
     recorder.addEventListener("dataavailable", (event) => {
         if (event.data && event.data.size > 0) {
@@ -209,6 +217,31 @@ async function describeFailure(response) {
         // Body was not the expected JSON; fall through.
     }
     return `Transcription failed (HTTP ${response.status}).`;
+}
+
+/*
+ * getUserMedia rejects for several unrelated reasons, and each needs a
+ * different action from the user: a denied permission is fixed in the
+ * browser settings, a missing device by plugging one in, a busy device by
+ * closing whatever else holds it. One generic message would leave the
+ * user guessing which of those they are facing.
+ */
+function describeMicrophoneError(err) {
+    switch (err && err.name) {
+        case "NotAllowedError":
+        case "SecurityError":
+            return "Microphone access was refused. Allow it in the browser's site settings and try again.";
+        case "NotFoundError":
+        case "DevicesNotFoundError":
+            return "No microphone was found. Connect one and try again.";
+        case "NotReadableError":
+        case "TrackStartError":
+            return "The microphone is in use by another application. Close it and try again.";
+        case "OverconstrainedError":
+            return "This microphone does not support the requested audio settings. Try a different input device.";
+        default:
+            return "The microphone could not be opened. Check the browser and system sound settings, then try again.";
+    }
 }
 
 function showTranscript(text) {
