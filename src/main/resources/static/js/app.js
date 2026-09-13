@@ -155,7 +155,11 @@ async function startRecording() {
         uploadForTranscription(blob);
     });
 
-    recorder.start();
+    // A one-second timeslice makes the encoder hand over data as it goes,
+    // instead of encoding the whole clip in one burst when stop is pressed.
+    // The wait between stopping and uploading then stays flat rather than
+    // growing with the length of the recording.
+    recorder.start(1000);
     setState(RECORDING);
 }
 
@@ -247,7 +251,10 @@ function describeMicrophoneError(err) {
 function showTranscript(text) {
     transcriptBox.textContent = "";
     const paragraph = document.createElement("p");
-    paragraph.textContent = text;
+    // textContent, not innerHTML: the transcript is text from outside the
+    // application and must never be interpreted as markup.
+    const transcript = typeof text === "string" ? text.trim() : "";
+    paragraph.textContent = transcript || "No speech was detected in that recording.";
     transcriptBox.appendChild(paragraph);
 }
 
