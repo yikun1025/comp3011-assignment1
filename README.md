@@ -98,6 +98,7 @@ API.
 | Body is not multipart | `HttpMediaTypeNotSupportedException` | 415 |
 | Missing `audio` part | `MissingServletRequestPartException` | 400 |
 | Empty upload | `ResponseStatusException` from the controller | 400 |
+| Malformed or truncated multipart body | `MultipartException` | 400 |
 | Upload too large | `MaxUploadSizeExceededException` | 413 |
 | Anything else | `Exception` | 500, fixed message; type, path and location logged, message not |
 

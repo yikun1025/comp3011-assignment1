@@ -19,6 +19,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -89,6 +90,20 @@ public class GlobalExceptionHandler {
             MissingServletRequestPartException ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST,
                 "Required multipart part '" + ex.getRequestPartName() + "' is missing.", request);
+    }
+
+    /**
+     * 400: the multipart body could not be parsed at all, e.g. an upload cut
+     * off when the connection dropped. This is the client's request being
+     * broken, not the server, so it must not fall through to the 500.
+     * MaxUploadSizeExceededException is a subclass and keeps its own 413
+     * handler below; Spring picks the most specific match.
+     */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> handleMalformedMultipart(
+            MultipartException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST,
+                "The upload was malformed or incomplete. Record again and retry.", request);
     }
 
     /**

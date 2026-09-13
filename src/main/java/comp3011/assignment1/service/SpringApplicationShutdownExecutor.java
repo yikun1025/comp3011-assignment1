@@ -48,7 +48,13 @@ public class SpringApplicationShutdownExecutor extends ShutdownExecutor {
                 // right outcome.
                 Thread.currentThread().interrupt();
             }
-            SpringApplication.exit(context, () -> 0);
+            // exit() closes the context and runs the graceful phase, but it
+            // does not end the process: the JVM only exits once every
+            // non-daemon thread has finished. Today nothing else is left
+            // running, so it would exit anyway - but that is an accident of
+            // the current bean set, not a guarantee. System.exit makes it one.
+            int exitCode = SpringApplication.exit(context, () -> 0);
+            System.exit(exitCode);
         }, "graceful-shutdown");
 
         closer.setDaemon(false);
